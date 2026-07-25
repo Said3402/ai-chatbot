@@ -1,0 +1,173 @@
+/**
+ * server.js — AI Chatbot Backend
+ * ------------------------------------------------------------------
+ * Endpoints:
+ *   POST /api/chat                 Website/app frontend
+ *   POST /webhooks/telegram        Telegram bot updates
+ *   GET|POST /webhooks/whatsapp    Meta WhatsApp Cloud API
+ *   GET|POST /webhooks/messenger   Facebook Messenger
+ *   GET  /health                   Liveness probe
+ *
+ * Run: npm install && cp .env.example .env  (fill in keys) && npm start
+ * ------------------------------------------------------------------
+ */
+
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const rateLimit = require("express-rate-limit");
+const { v4: uuidv4 } = require("uuid");
+const { GoogleGenAI } = require("@google/genai");
+const fs = require("fs");
+const path = require("path");
+
+const memory = require("./memory");
+const kb = require("./knowledgeBase");
+const telegram = require("../integrations/telegram-bot");
+const whatsapp = require("../integrations/whatsapp-webhook");
+const messenger = require("../integrations/messenger-webhook");
+
+const app = express();
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use(express.json({ verify: (req, res, buf) => (req.rawBody = buf) }));
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
+
+const SYSTEM_PROMPT = fs.readFileSync(
+  path.join(__dirname, "systemPrompt.txt"),
+  "utf-8"
+);
+
+// --- Rate limiting: protects the API key and controls cost ---
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20, // 20 messages/minute/IP
+  message: { error: "Too many requests. Please slow down." }
+});
+
+// --- Basic input safety net (defense in depth; the model does the real work) ---
+const BLOCKED_PATTERNS = [
+  /how (do|can) i (make|build) a bomb/i,
+  /child sexual/i
+];
+function looksUnsafe(text) {
+  return BLOCKED_PATTERNS.some((re) => re.test(text));
+}
+
+/**
+ * Core reasoning function shared by every channel (web, Telegram,
+ * WhatsApp, Messenger). Keeping ONE function here means the system
+ * prompt, memory, and KB logic never drift between channels.
+ */
+async function generateReply(sessionId, userText) {
+  if (!userText || !userText.trim()) {
+    return { text: "Could you share a bit more detail so I can help? / Don ka bayyana dan kadan don in taimaka?", blocked: false };
+  }
+
+  if (looksUnsafe(userText)) {
+    return {
+      text: "I can't help with that request. If you need something else, I'm happy to assist. / Ba zan iya taimakawa da wannan ba. Idan kana bukatar wani abu daban, ina nan a shirye.",
+      blocked: true
+    };
+  }
+
+  memory.addTurn(sessionId, "user", userText);
+
+  const contextBlock = kb.buildContextBlock(userText);
+  const messages = memory.getMessagesForModel(sessionId).map((m) => ({
+    role: m.role,
+    content: m.content
+  }));
+
+  // Inject retrieved KB context into the latest user turn only.
+  if (contextBlock) {
+    const last = messages[messages.length - 1];
+    last.content = `${contextBlock}\n\nUser question: ${userText}`;
+  }
+
+  const summary = memory.getSummary(sessionId);
+  const systemWithSummary = summary
+    ? `${SYSTEM_PROMPT}\n\n<conversation_summary>\n${summary}\n</conversation_summary>`
+    : SYSTEM_PROMPT;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1000,
+      system: systemWithSummary,
+      messages
+    });
+
+    const text = response.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+
+    memory.addTurn(sessionId, "assistant", text);
+    return { text, blocked: false };
+  } catch (err) {
+    console.error("Anthropic API error:", err.message);
+    return {
+      text: "Sorry, I'm having trouble responding right now. Please try again in a moment. / Yi haƙuri, ina fuskantar matsala wajen amsawa yanzu. Da fatan za a sake gwadawa.",
+      blocked: false,
+      error: true
+    };
+  }
+}
+
+// ---------------------------------------------------------------
+// Website / app chat endpoint
+// ---------------------------------------------------------------
+app.post("/api/chat", chatLimiter, async (req, res) => {
+  const { message, sessionId } = req.body;
+  const sid = sessionId || uuidv4();
+
+  const { text, error } = await generateReply(sid, message);
+  res.json({ sessionId: sid, reply: text, error: !!error });
+});
+
+// ---------------------------------------------------------------
+// Telegram webhook
+// ---------------------------------------------------------------
+app.post("/webhooks/telegram", async (req, res) => {
+  res.sendStatus(200); // ack immediately; Telegram retries on timeout
+  try {
+    await telegram.handleUpdate(req.body, generateReply);
+  } catch (err) {
+    console.error("Telegram handler error:", err);
+  }
+});
+
+// ---------------------------------------------------------------
+// WhatsApp (Meta Cloud API) webhook
+// ---------------------------------------------------------------
+app.get("/webhooks/whatsapp", (req, res) => whatsapp.verify(req, res));
+app.post("/webhooks/whatsapp", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    await whatsapp.handleUpdate(req.body, generateReply);
+  } catch (err) {
+    console.error("WhatsApp handler error:", err);
+  }
+});
+
+// ---------------------------------------------------------------
+// Facebook Messenger webhook
+// ---------------------------------------------------------------
+app.get("/webhooks/messenger", (req, res) => messenger.verify(req, res));
+app.post("/webhooks/messenger", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    await messenger.handleUpdate(req.body, generateReply);
+  } catch (err) {
+    console.error("Messenger handler error:", err);
+  }
+});
+
+app.get("/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
+
+setInterval(() => memory.purgeExpired(), 1000 * 60 * 15);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Chatbot backend running on port ${PORT}`));

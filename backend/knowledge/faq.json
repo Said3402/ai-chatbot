@@ -1,0 +1,26 @@
+[
+  {
+    "id": "services",
+    "en": "Amina can help users with questions, information, guidance, and customer support in English and Hausa.",
+    "ha": "Amina tana taimaka wa masu amfani da tambayoyi, bayanai, jagora, da taimakon abokan ciniki cikin Turanci da Hausa.",
+    "keywords": [
+      "services",
+      "what can you do",
+      "help me",
+      "taimako",
+      "me zaka iya yi"
+    ]
+  },
+  {
+    "id": "hours",
+    "en": "Support hours are Monday to Friday, 8:00 AM to 6:00 PM (WAT).",
+    "ha": "Lokutan aiki su ne Litinin zuwa Jumma'a, daga karfe 8:00 na safe zuwa 6:00 na yamma (WAT).",
+    "keywords": [
+      "hours",
+      "open",
+      "close",
+      "lokaci",
+      "aiki"
+    ]
+  }
+]
