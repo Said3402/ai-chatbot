@@ -24,9 +24,9 @@ const documentStore = require("./documentStore");
 const memory = require("./memory");
 const kb = require("./knowledgeBase")
 const userMemory = require("./userMemory");
-const telegram = require("../integrations/telegram-bot");
-const whatsapp = require("../integrations/whatsapp-webhook");
-const messenger = require("../integrations/messenger-webhook");
+const telegram = require("./integrations/telegram-bot");
+const whatsapp = require("./integrations/whatsapp-webhook");
+const messenger = require("./integrations/messenger-webhook");
 
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
