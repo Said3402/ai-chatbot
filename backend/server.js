@@ -153,15 +153,23 @@ const text = response.text;
 memory.addTurn(sessionId, "assistant", text);
 return { text, blocked: false };
 
-} catch (err) {
-  console.error("Gemini API error:");
-console.error(err);
+}
+ catch (err) {
+  console.error("Gemini API error:", err);
+
+  let message =
+    "Waleed AI is temporarily unavailable. Please try again in a few moments.";
+
+  if (err.message && err.message.includes("429")) {
+    message =
+      "Waleed AI has reached its daily AI usage limit. Please try again later.";
+  }
 
   return {
-  text: `Gemini Error: ${err.message}`,
-  blocked: false,
-  error: true
-};
+    text: message,
+    blocked: false,
+    error: true,
+  };
 }
 } 
 
@@ -237,3 +245,4 @@ const PORT = process.env.PORT || 3000;
     console.log(`Chatbot backend running on port ${PORT}`);
   });
 })();
+
