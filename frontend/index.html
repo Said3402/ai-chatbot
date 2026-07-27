@@ -136,7 +136,7 @@
       <h1>Waleed AI</h1>
       <p>English • Hausa — AI Assistant Online</p>
     </div>
-  </div>
+<button id="clearChat" title="Clear Chat">🗑️</button>
 </header>
     <div id="log"></div>
     <form id="form">
@@ -153,9 +153,21 @@
   const form = document.getElementById("form");
   const input = document.getElementById("input");
   const sendBtn = document.getElementById("send");
+  const clearChatBtn = document.getElementById("clearChat");
 
   input.focus();
+  clearChatBtn.addEventListener("click", () => {
+  log.innerHTML = "";
+  localStorage.removeItem("chat_session_id");
+  sessionId = null;
 
+  addMessage(
+    "Hi! I'm Waleed AI. Ask me anything — English or Hausa. / Sannu! Ni ne Waleed AI. Ka tambaye ni komai — Turanci ko Hausa.",
+    "bot"
+  );
+
+  input.focus();
+});
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
