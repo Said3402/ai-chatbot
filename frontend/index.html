@@ -156,6 +156,13 @@
 
   input.focus();
 
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+
   let sessionId = localStorage.getItem("chat_session_id") || null;
 
   function addMessage(text, role) {
