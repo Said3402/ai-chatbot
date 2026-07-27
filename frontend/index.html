@@ -39,13 +39,16 @@
     box-shadow: 0 20px 40px -20px rgba(28, 43, 45, 0.35);
   }
   header {
-    background: var(--accent);
-    color: white;
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  background: var(--accent);
+  color: white;
+  padding: 18px 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
   header .dot {
     width: 9px; height: 9px; border-radius: 50%;
     background: #7ee0b8; box-shadow: 0 0 0 3px rgba(126,224,184,0.25);
@@ -127,12 +130,14 @@
 <body>
   <div class="card">
     <header>
-      <span class="dot"></span>
-      <div>
-        <h1>Waleed AI</h1>
-        <p>English • Hausa — online now</p>
-      </div>
-    </header>
+  <div class="brand">
+    <span class="dot"></span>
+    <div>
+      <h1>Waleed AI</h1>
+      <p>English • Hausa — AI Assistant Online</p>
+    </div>
+  </div>
+</header>
     <div id="log"></div>
     <form id="form">
       <input id="input" type="text" placeholder="Type your message… / Rubuta sakonka…" autocomplete="off" />
@@ -148,6 +153,8 @@
   const form = document.getElementById("form");
   const input = document.getElementById("input");
   const sendBtn = document.getElementById("send");
+
+  input.focus();
 
   let sessionId = localStorage.getItem("chat_session_id") || null;
 
